@@ -50,7 +50,7 @@ export abstract class Config {
             throw new Error(`Storage ${name} not found`);
         }
 
-        // this.storages.
+        this.storages.removeConfig(name);
     }
 
     public abstract save(): Promise<void>;

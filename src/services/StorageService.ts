@@ -1,20 +1,23 @@
 import {
-    DockerService,
     Injectable,
-    PluginConfigService
+    AppConfigService,
+    PluginConfigService,
+    ProxyService,
+    DockerService
 } from "@wocker/core";
 import {promptText, promptSelect} from "@wocker/utils";
 
-import {Storage} from "../makes/Storage";
+import {Storage, StorageType} from "../makes/Storage";
 import {Config, ConfigProps} from "../makes/Config";
-import {ConfigItemType} from "../makes/ConfigItem";
 import {STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS} from "../env";
 
 
 @Injectable()
 export class StorageService {
     public constructor(
+        protected readonly appConfigService: AppConfigService,
         protected readonly pluginConfigService: PluginConfigService,
+        protected readonly proxyService: ProxyService,
         protected readonly dockerService: DockerService
     ) {}
 
@@ -28,7 +31,7 @@ export class StorageService {
         return this._config;
     }
 
-    public async addStorage(name?: string, type?: ConfigItemType): Promise<void> {
+    public async addStorage(name?: string, type?: StorageType, user?: string, password?: string): Promise<void> {
         const config = this.getConfig();
 
         if(!name) {
@@ -45,18 +48,59 @@ export class StorageService {
         }
 
         if(!type || ![STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS].includes(type)) {
-            type = await promptSelect<ConfigItemType>({
+            type = await promptSelect<StorageType>({
                 message: "Storage type:",
                 options: [
-                    {label: "Minio", value: STORAGE_TYPE_MINIO},
-                    {label: "Redis", value: STORAGE_TYPE_REDIS}
+                    {label: "MinIO", value: STORAGE_TYPE_MINIO},
+                    // {label: "Redis", value: STORAGE_TYPE_REDIS}
                 ]
             });
         }
 
+        if(!user || user.length < 3) {
+            user = await promptText({
+                required: true,
+                message: "Username:",
+                type: "string",
+                validate(value) {
+                    if(!value || value.length < 3) {
+                        return "Username length should be at least 3 characters";
+                    }
+
+                    return true;
+                }
+            }) as string;
+        }
+
+        if(!password || password.length < 8) {
+            password = await promptText({
+                required: true,
+                message: "Password:",
+                type: "password",
+                validate(value) {
+                    if(!value || value.length < 8) {
+                        return "Password length should be at least 8 characters";
+                    }
+
+                    return true;
+                }
+            }) as string;
+
+            const passwordConfirm = await promptText({
+                message: "Confirm password:",
+                type: "password"
+            }) as string;
+
+            if(password !== passwordConfirm) {
+                throw new Error("Passwords do not match")
+            }
+        }
+
         storage = new Storage({
             name,
-            type
+            type,
+            username: user,
+            password
         });
 
         config.storages.setConfig(storage);
@@ -67,7 +111,28 @@ export class StorageService {
     public async destroyStorage(name: string): Promise<void> {
         const config = this.getConfig();
 
-        config.storages.removeConfig(name);
+        const storage = config.getStorage(name);
+
+        switch(storage.type) {
+            case STORAGE_TYPE_MINIO: {
+                await this.dockerService.removeContainer(storage.containerName);
+
+                // @ts-ignore
+                if(this.appConfigService.isVersionGTE && this.appConfigService.isVersionGTE("1.0.19")) {
+                    // @ts-ignore
+                    if(await this.dockerService.hasVolume(storage.volumeName)) {
+                        // @ts-ignore
+                        await this.dockerService.rmVolume(storage.volumeName);
+                    }
+                }
+                break;
+            }
+
+            case STORAGE_TYPE_REDIS:
+                break;
+        }
+
+        config.removeStorage(name);
 
         await config.save();
     }
@@ -80,24 +145,74 @@ export class StorageService {
         return "";
     }
 
-    public async start(name?: string): Promise<void> {
+    public async start(name?: string, restart?: boolean): Promise<void> {
         const storage = this.config.getStorage(name);
 
-        if(!storage) {
-            throw new Error(name ? `Storage ${name} not found` : "Default storage not found");
-        }
+        switch(storage.type) {
+            case STORAGE_TYPE_MINIO: {
+                if(restart) {
+                    await this.dockerService.removeContainer(storage.containerName);
+                }
 
-        console.log(storage);
+                let container = await this.dockerService.getContainer(storage.containerName);
+
+                if(!container) {
+                    container = await this.dockerService.createContainer({
+                        cmd: ["server", "/data", "--address", ":80", "--console-address", ":9000"],
+                        name: storage.containerName,
+                        image: "minio/minio:latest",
+                        env: {
+                            VIRTUAL_HOST: storage.containerName,
+                            VIRTUAL_PORT: "9000",
+                            MINIO_ROOT_USER: storage.username,
+                            MINIO_ROOT_PASSWORD: storage.password
+                        },
+                        volumes: [
+                            `${storage.volumeName}:/data`
+                        ]
+                    });
+                }
+
+                const {
+                    State: {
+                        Running
+                    }
+                } = await container.inspect();
+
+                if(!Running) {
+                    await container.start();
+                    await this.proxyService.start();
+                }
+                break;
+            }
+
+            case STORAGE_TYPE_REDIS: {
+                break;
+            }
+        }
     }
 
     public async stop(name?: string): Promise<void> {
         const storage = this.config.getStorage(name);
 
-        if(!storage) {
-            throw new Error(name ? `Storage ${name} not found` : "Default storage not found");
-        }
+        switch(storage.type) {
+            case STORAGE_TYPE_MINIO: {
+                await this.dockerService.removeContainer(storage.containerName);
+                break;
+            }
 
-        console.log(storage);
+            case STORAGE_TYPE_REDIS: {
+                break;
+            }
+        }
+    }
+
+    public async use(name: string): Promise<void> {
+        const storage = this.config.getStorage(name);
+
+        this.config.default = storage.name;
+
+        await this.config.save();
     }
 
     public getConfig(): Config {
@@ -110,7 +225,9 @@ export class StorageService {
                 items: [
                     {
                         name: "default",
-                        type: STORAGE_TYPE_MINIO
+                        type: STORAGE_TYPE_MINIO,
+                        username: "root",
+                        password: "root"
                     }
                 ]
             };
