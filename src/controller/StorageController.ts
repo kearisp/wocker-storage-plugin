@@ -45,9 +45,19 @@ export class StorageController {
     @Command("storage:destroy [name]")
     public async destroy(
         @Param("name")
-        name: string
+        name: string,
+        @Option("yes", {
+            type: "boolean",
+            alias: "y"
+        })
+        yes?: boolean,
+        @Option("force", {
+            type: "boolean",
+            alias: "f"
+        })
+        force?: boolean
     ): Promise<void> {
-        await this.storageService.destroyStorage(name);
+        await this.storageService.destroyStorage(name, yes, force);
     }
 
     @Command("storage:ls")
