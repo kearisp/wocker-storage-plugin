@@ -6,6 +6,7 @@ import {
     DockerService
 } from "@wocker/core";
 import {promptText, promptSelect} from "@wocker/utils";
+import CliTable from "cli-table3";
 
 import {Storage, StorageType} from "../makes/Storage";
 import {Config, ConfigProps} from "../makes/Config";
@@ -117,11 +118,8 @@ export class StorageService {
             case STORAGE_TYPE_MINIO: {
                 await this.dockerService.removeContainer(storage.containerName);
 
-                // @ts-ignore
                 if(this.appConfigService.isVersionGTE && this.appConfigService.isVersionGTE("1.0.19")) {
-                    // @ts-ignore
                     if(await this.dockerService.hasVolume(storage.volumeName)) {
-                        // @ts-ignore
                         await this.dockerService.rmVolume(storage.volumeName);
                     }
                 }
@@ -138,11 +136,15 @@ export class StorageService {
     }
 
     public async list(): Promise<string> {
+        const table = new CliTable({
+            head: ["Name", "Type", "Container name"]
+        });
+
         for(const storage of this.config.storages.items) {
-            console.info(storage.name, storage.type, storage.containerName);
+            table.push([storage.name + (this.config.default === storage.name ? " (default)" : ""), storage.type, storage.containerName]);
         }
 
-        return "";
+        return table.toString();
     }
 
     public async start(name?: string, restart?: boolean): Promise<void> {
