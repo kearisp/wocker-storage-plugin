@@ -5,7 +5,7 @@ import {
     ProxyService,
     DockerService
 } from "@wocker/core";
-import {promptText, promptSelect} from "@wocker/utils";
+import {promptText, promptSelect, promptConfirm} from "@wocker/utils";
 import CliTable from "cli-table3";
 
 import {Storage, StorageType} from "../makes/Storage";
@@ -109,10 +109,25 @@ export class StorageService {
         await config.save();
     }
 
-    public async destroyStorage(name: string): Promise<void> {
+    public async destroyStorage(name: string, yes?: boolean, force?: boolean): Promise<void> {
         const config = this.getConfig();
 
         const storage = config.getStorage(name);
+
+        if(!force && storage.name === config.default) {
+            throw new Error(`Cannot delete the default storage. To proceed, use the --force or -f option.`);
+        }
+
+        if(!yes) {
+            const confirm = await promptConfirm({
+                message: `Are you sure you want to delete the "${name}" repository? This action cannot be undone and all data will be lost.`,
+                default: false
+            });
+
+            if(!confirm) {
+                throw new Error("Aborted");
+            }
+        }
 
         switch(storage.type) {
             case STORAGE_TYPE_MINIO: {

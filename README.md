@@ -1,4 +1,4 @@
-# @wocker/mariadb-plugin
+# @wocker/storage-plugin
 
 ###### Docker workspace for web projects
 
