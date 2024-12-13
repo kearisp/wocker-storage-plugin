@@ -15,6 +15,8 @@ import {STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS} from "../env";
 
 @Injectable()
 export class StorageService {
+    protected _config?: Config;
+
     public constructor(
         protected readonly appConfigService: AppConfigService,
         protected readonly pluginConfigService: PluginConfigService,
@@ -22,18 +24,25 @@ export class StorageService {
         protected readonly dockerService: DockerService
     ) {}
 
-    protected _config?: Config;
-
     public get config(): Config {
         if(!this._config) {
-            this._config = this.getConfig();
+            const fs = this.pluginConfigService.fs;
+            const data: ConfigProps = fs.exists("config.json")
+                ? fs.readJSON("config.json")
+                : {};
+
+            this._config = new class extends Config {
+                public async save(): Promise<void> {
+                    fs.writeJSON("config.json", this.toJSON());
+                }
+            }(data);
         }
 
         return this._config;
     }
 
     public async addStorage(name?: string, type?: StorageType, user?: string, password?: string): Promise<void> {
-        const config = this.getConfig();
+        const config = this.config;
 
         if(!name) {
             name = await promptText({
@@ -104,13 +113,17 @@ export class StorageService {
             password
         });
 
+        if(!config.default) {
+            config.default = storage.name;
+        }
+
         config.storages.setConfig(storage);
 
         await config.save();
     }
 
     public async destroyStorage(name: string, yes?: boolean, force?: boolean): Promise<void> {
-        const config = this.getConfig();
+        const config = this.config;
 
         const storage = config.getStorage(name);
 
@@ -120,7 +133,7 @@ export class StorageService {
 
         if(!yes) {
             const confirm = await promptConfirm({
-                message: `Are you sure you want to delete the "${name}" repository? This action cannot be undone and all data will be lost.`,
+                message: `Are you sure you want to delete the "${name}" storage? This action cannot be undone and all data will be lost.`,
                 default: false
             });
 
@@ -145,6 +158,10 @@ export class StorageService {
                 break;
         }
 
+        if(name === config.default) {
+            delete config.default;
+        }
+
         config.removeStorage(name);
 
         await config.save();
@@ -163,6 +180,10 @@ export class StorageService {
     }
 
     public async start(name?: string, restart?: boolean): Promise<void> {
+        if(!name && !this.config.default) {
+            await this.addStorage();
+        }
+
         const storage = this.config.getStorage(name);
 
         switch(storage.type) {
@@ -230,29 +251,5 @@ export class StorageService {
         this.config.default = storage.name;
 
         await this.config.save();
-    }
-
-    public getConfig(): Config {
-        const fs = this.pluginConfigService.fs;
-
-        const data: ConfigProps = fs.exists("config.json")
-            ? this.pluginConfigService.fs.readJSON("config.json")
-            : {
-                default: "default",
-                items: [
-                    {
-                        name: "default",
-                        type: STORAGE_TYPE_MINIO,
-                        username: "root",
-                        password: "root"
-                    }
-                ]
-            };
-
-        return new class extends Config {
-            public async save(): Promise<void> {
-                fs.writeJSON("config.json", this.toJSON());
-            }
-        }(data);
     }
 }
