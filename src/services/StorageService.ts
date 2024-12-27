@@ -125,15 +125,15 @@ export class StorageService {
     public async destroyStorage(name: string, yes?: boolean, force?: boolean): Promise<void> {
         const config = this.config;
 
-        const storage = config.getStorage(name);
+        const storage = this.config.getStorage(name);
 
-        if(!force && storage.name === config.default) {
+        if(!force && storage.name === this.config.default) {
             throw new Error(`Cannot delete the default storage. To proceed, use the --force or -f option.`);
         }
 
         if(!yes) {
             const confirm = await promptConfirm({
-                message: `Are you sure you want to delete the "${name}" storage? This action cannot be undone and all data will be lost.`,
+                message: `Are you sure you want to delete the "${storage.name}" storage? This action cannot be undone and all data will be lost.`,
                 default: false
             });
 
