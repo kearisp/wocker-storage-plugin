@@ -1,6 +1,6 @@
 {
     "name": "@wocker/storage-plugin",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "author": "Kris Papercut <krispcut@gmail.com>",
     "description": "S3 storage for wocker",
     "license": "MIT",
@@ -25,12 +25,11 @@
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "dependencies": {
-        "@wocker/core": "^1.0.19",
+        "@wocker/core": "^1.0.21",
         "@wocker/utils": "^1.0.7",
         "cli-table3": "^0.6.5"
     },
     "devDependencies": {
-        "@types/node": "^22.7.8",
         "typescript": "^5.6.3"
     }
 }
