@@ -1,5 +1,3 @@
-import {ConfigCollection} from "@wocker/core";
-
 import {Storage, StorageProps} from "./Storage";
 
 
@@ -19,11 +17,13 @@ export abstract class Config {
         } = props;
 
         this.default = defaultStorage;
-        this.storages = storages.map((props) => new Storage(props));;
+        this.storages = storages.map((props) => new Storage(props));
     }
 
     public hasStorage(name: string): boolean {
-        return false;
+        const storage = this.storages.find((storage) => storage.name === name);
+
+        return !!storage;
     }
 
     public getDefaultStorage(): Storage {

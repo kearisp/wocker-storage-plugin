@@ -52,6 +52,14 @@ export class StorageService {
                 message: "Storage name:",
                 type: "string",
                 validate: (name?: string) => {
+                    if(!name) {
+                        return "Storage name is required";
+                    }
+
+                    if(this.config.hasStorage(name)) {
+                        return `Storage "${name}" is already exists`;
+                    }
+
                     return true;
                 }
             }) as string;
