@@ -112,8 +112,6 @@ export class StorageService {
     }
 
     public async destroy(name: string, yes?: boolean, force?: boolean): Promise<void> {
-        const config = this.config;
-
         const storage = this.config.getStorage(name);
 
         if(!force && storage.name === this.config.default) {
@@ -147,13 +145,9 @@ export class StorageService {
                 break;
         }
 
-        if(name === config.default) {
-            delete config.default;
-        }
+        this.config.removeStorage(name);
 
-        config.removeStorage(name);
-
-        await config.save();
+        await this.config.save();
     }
 
     public async list(): Promise<string> {
@@ -187,7 +181,7 @@ export class StorageService {
                     container = await this.dockerService.createContainer({
                         cmd: ["server", "/data", "--address", ":80", "--console-address", ":9000"],
                         name: storage.containerName,
-                        image: "minio/minio:latest",
+                        image: storage.imageTag,
                         env: {
                             VIRTUAL_HOST: storage.containerName,
                             VIRTUAL_PORT: "9000",

@@ -35,6 +35,10 @@ export abstract class Config {
     }
 
     public getStorage(name: string): Storage {
+        if(!name) {
+            throw new Error("Storage name is not provided");
+        }
+
         const storage = this.storages.find((storage) => {
             return storage.name === name;
         });
