@@ -39,7 +39,12 @@ export class StorageController {
         })
         password?: string
     ): Promise<void> {
-        await this.storageService.addStorage(name, type, user, password);
+        await this.storageService.create({
+            name,
+            type,
+            username: user,
+            password
+        });
     }
 
     @Command("storage:destroy [name]")
@@ -57,7 +62,7 @@ export class StorageController {
         })
         force?: boolean
     ): Promise<void> {
-        await this.storageService.destroyStorage(name, yes, force);
+        await this.storageService.destroy(name, yes, force);
     }
 
     @Command("storage:ls")

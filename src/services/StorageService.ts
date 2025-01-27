@@ -8,7 +8,7 @@ import {
 import {promptText, promptSelect, promptConfirm} from "@wocker/utils";
 import CliTable from "cli-table3";
 
-import {Storage, StorageType} from "../makes/Storage";
+import {Storage, StorageType, StorageProps} from "../makes/Storage";
 import {Config, ConfigProps} from "../makes/Config";
 import {STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS} from "../env";
 
@@ -32,7 +32,13 @@ export class StorageService {
                 : {};
 
             this._config = new class extends Config {
-                public async save(): Promise<void> {
+                public save(): void {
+                    if(!fs.exists()) {
+                        fs.mkdir("", {
+                            recursive: true
+                        });
+                    }
+
                     fs.writeJSON("config.json", this.toJSON());
                 }
             }(data);
@@ -41,24 +47,36 @@ export class StorageService {
         return this._config;
     }
 
-    public async addStorage(name?: string, type?: StorageType, user?: string, password?: string): Promise<void> {
-        const config = this.config;
+    public async create(storageProps: Partial<StorageProps> = {}): Promise<void> {
+        if(storageProps.name && this.config.hasStorage(storageProps.name)) {
+            console.info(`Storage "${storageProps.name}" already exists`);
+            delete storageProps.name;
+        }
 
-        if(!name) {
-            name = await promptText({
+        if(!storageProps.name) {
+            storageProps.name = await promptText({
                 message: "Storage name:",
-                type: "string"
+                type: "string",
+                validate: (name?: string) => {
+                    if(!name) {
+                        return "Storage name is required";
+                    }
+
+                    if(this.config.hasStorage(name)) {
+                        return `Storage "${name}" is already exists`;
+                    }
+
+                    return true;
+                }
             }) as string;
         }
 
-        let storage = config.storages.getConfig(name);
-
-        if(storage) {
-            throw new Error(`Storage ${name} already exists`);
+        if(storageProps.type && ![STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS].includes(storageProps.type)) {
+            delete storageProps.type;
         }
 
-        if(!type || ![STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS].includes(type)) {
-            type = await promptSelect<StorageType>({
+        if(!storageProps.type) {
+            storageProps.type = await promptSelect<StorageType>({
                 message: "Storage type:",
                 options: [
                     {label: "MinIO", value: STORAGE_TYPE_MINIO},
@@ -67,8 +85,12 @@ export class StorageService {
             });
         }
 
-        if(!user || user.length < 3) {
-            user = await promptText({
+        if(storageProps.username && storageProps.username.length < 3) {
+            delete storageProps.username;
+        }
+
+        if(!storageProps.username) {
+            storageProps.username = await promptText({
                 required: true,
                 message: "Username:",
                 type: "string",
@@ -82,8 +104,13 @@ export class StorageService {
             }) as string;
         }
 
-        if(!password || password.length < 8) {
-            password = await promptText({
+        if(storageProps.password && storageProps.password.length < 8) {
+            console.info("Password length should be at least 8 characters");
+            delete storageProps.password;
+        }
+
+        if(!storageProps.password) {
+            storageProps.password = await promptText({
                 required: true,
                 message: "Password:",
                 type: "password",
@@ -101,30 +128,16 @@ export class StorageService {
                 type: "password"
             }) as string;
 
-            if(password !== passwordConfirm) {
+            if(storageProps.password !== passwordConfirm) {
                 throw new Error("Passwords do not match")
             }
         }
 
-        storage = new Storage({
-            name,
-            type,
-            username: user,
-            password
-        });
-
-        if(!config.default) {
-            config.default = storage.name;
-        }
-
-        config.storages.setConfig(storage);
-
-        await config.save();
+        this.config.setStorage(new Storage(storageProps as StorageProps));
+        this.config.save();
     }
 
-    public async destroyStorage(name: string, yes?: boolean, force?: boolean): Promise<void> {
-        const config = this.config;
-
+    public async destroy(name: string, yes?: boolean, force?: boolean): Promise<void> {
         const storage = this.config.getStorage(name);
 
         if(!force && storage.name === this.config.default) {
@@ -158,13 +171,8 @@ export class StorageService {
                 break;
         }
 
-        if(name === config.default) {
-            delete config.default;
-        }
-
-        config.removeStorage(name);
-
-        await config.save();
+        this.config.removeStorage(name);
+        this.config.save();
     }
 
     public async list(): Promise<string> {
@@ -172,7 +180,7 @@ export class StorageService {
             head: ["Name", "Type", "Container name"]
         });
 
-        for(const storage of this.config.storages.items) {
+        for(const storage of this.config.storages) {
             table.push([storage.name + (this.config.default === storage.name ? " (default)" : ""), storage.type, storage.containerName]);
         }
 
@@ -181,10 +189,10 @@ export class StorageService {
 
     public async start(name?: string, restart?: boolean): Promise<void> {
         if(!name && !this.config.default) {
-            await this.addStorage();
+            await this.create();
         }
 
-        const storage = this.config.getStorage(name);
+        const storage = this.config.getStorageOrDefault(name);
 
         switch(storage.type) {
             case STORAGE_TYPE_MINIO: {
@@ -198,7 +206,7 @@ export class StorageService {
                     container = await this.dockerService.createContainer({
                         cmd: ["server", "/data", "--address", ":80", "--console-address", ":9000"],
                         name: storage.containerName,
-                        image: "minio/minio:latest",
+                        image: storage.imageTag,
                         env: {
                             VIRTUAL_HOST: storage.containerName,
                             VIRTUAL_PORT: "9000",
@@ -231,7 +239,7 @@ export class StorageService {
     }
 
     public async stop(name?: string): Promise<void> {
-        const storage = this.config.getStorage(name);
+        const storage = this.config.getStorageOrDefault(name);
 
         switch(storage.type) {
             case STORAGE_TYPE_MINIO: {
@@ -250,6 +258,6 @@ export class StorageService {
 
         this.config.default = storage.name;
 
-        await this.config.save();
+        this.config.save();
     }
 }

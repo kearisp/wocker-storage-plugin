@@ -1,5 +1,3 @@
-import {ConfigCollection} from "@wocker/core";
-
 import {Storage, StorageProps} from "./Storage";
 
 
@@ -10,7 +8,7 @@ export type ConfigProps = {
 
 export abstract class Config {
     public default?: string;
-    public storages: ConfigCollection<Storage, StorageProps>;
+    public storages: Storage[];
 
     public constructor(props: ConfigProps) {
         const {
@@ -19,46 +17,80 @@ export abstract class Config {
         } = props;
 
         this.default = defaultStorage;
-        this.storages = new ConfigCollection(Storage, storages);
+        this.storages = storages.map((props) => new Storage(props));
     }
 
-    public getStorage(name?: string): Storage {
-        if(!name) {
-            if(!this.default)
-                throw new Error("Default storage is not defined");
+    public hasStorage(name: string): boolean {
+        const storage = this.storages.find((storage) => storage.name === name);
 
-            const storage = this.storages.getConfig(this.default);
+        return !!storage;
+    }
 
-            if(!storage)
-                throw new Error(`Default storage ${this.default} not found`);
-
-            return storage;
+    public getDefaultStorage(): Storage {
+        if(!this.default) {
+            throw new Error("Default storage is not defined");
         }
 
-        const storage = this.storages.getConfig(name);
+        return this.getStorage(this.default);
+    }
 
-        if(!storage)
-            throw new Error(`Storage ${name} not found`);
+    public getStorage(name: string): Storage {
+        if(!name) {
+            throw new Error("Storage name is not provided");
+        }
+
+        const storage = this.storages.find((storage) => {
+            return storage.name === name;
+        });
+
+        if(!storage) {
+            throw new Error(`Storage "${name}" not found`);
+        }
 
         return storage;
     }
 
-    public removeStorage(name: string): void {
-        const storage = this.storages.getConfig(name);
-
-        if(!storage) {
-            throw new Error(`Storage ${name} not found`);
+    public getStorageOrDefault(name?: string): Storage {
+        if(!name) {
+            return this.getDefaultStorage();
         }
 
-        this.storages.removeConfig(name);
+        return this.getStorage(name);
     }
 
-    public abstract save(): Promise<void>;
+    public setStorage(storage: Storage): void {
+        let exists = false;
+
+        for(let i = 0; i < this.storages.length; i++) {
+            if(this.storages[i].name === storage.name) {
+                exists = true;
+                this.storages[i] = storage;
+            }
+        }
+
+        if(!exists) {
+            this.storages.push(storage);
+        }
+
+        if(!this.default) {
+            this.default = storage.name;
+        }
+    }
+
+    public removeStorage(name: string): void {
+        this.storages = this.storages.filter((storage) => storage.name !== name);
+
+        if(this.default === name) {
+            delete this.default;
+        }
+    }
+
+    public abstract save(): void;
 
     public toJSON(): ConfigProps {
         return {
             default: this.default,
-            storages: this.storages.toArray()
+            storages: this.storages.map((storage) => storage.toObject())
         };
     }
 }

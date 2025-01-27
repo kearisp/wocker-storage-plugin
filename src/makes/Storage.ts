@@ -15,6 +15,8 @@ export class Storage extends Config<StorageProps> {
     public type: StorageType;
     public username: string;
     public password: string;
+    public imageName?: string;
+    public imageVersion?: string;
 
     public constructor(props: StorageProps) {
         super(props);
@@ -36,5 +38,26 @@ export class Storage extends Config<StorageProps> {
 
     public get volumeName(): string {
         return `wocker-storage-${this.type}-${this.name}`;
+    }
+
+    public get imageTag(): string {
+        let imageName = this.imageName,
+            imageVersion = this.imageVersion;
+
+        if(!imageName || !imageVersion) {
+            switch(this.type) {
+                case STORAGE_TYPE_MINIO:
+                    imageName = "minio/minio";
+                    imageVersion = "latest";
+                    break;
+
+                case STORAGE_TYPE_REDIS:
+                    imageName = "redis";
+                    imageVersion = "latest";
+                    break;
+            }
+        }
+
+        return `${imageName}:${imageVersion}`;
     }
 }
