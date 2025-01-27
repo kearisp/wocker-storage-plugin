@@ -32,7 +32,13 @@ export class StorageService {
                 : {};
 
             this._config = new class extends Config {
-                public async save(): Promise<void> {
+                public save(): void {
+                    if(!fs.exists()) {
+                        fs.mkdir("", {
+                            recursive: true
+                        });
+                    }
+
                     fs.writeJSON("config.json", this.toJSON());
                 }
             }(data);
@@ -65,7 +71,11 @@ export class StorageService {
             }) as string;
         }
 
-        if(!storageProps.type || ![STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS].includes(storageProps.type)) {
+        if(storageProps.type && ![STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS].includes(storageProps.type)) {
+            delete storageProps.type;
+        }
+
+        if(!storageProps.type) {
             storageProps.type = await promptSelect<StorageType>({
                 message: "Storage type:",
                 options: [
@@ -75,7 +85,11 @@ export class StorageService {
             });
         }
 
-        if(!storageProps.username || storageProps.username.length < 3) {
+        if(storageProps.username && storageProps.username.length < 3) {
+            delete storageProps.username;
+        }
+
+        if(!storageProps.username) {
             storageProps.username = await promptText({
                 required: true,
                 message: "Username:",
@@ -90,7 +104,12 @@ export class StorageService {
             }) as string;
         }
 
-        if(!storageProps.password || storageProps.password.length < 8) {
+        if(storageProps.password && storageProps.password.length < 8) {
+            console.info("Password length should be at least 8 characters");
+            delete storageProps.password;
+        }
+
+        if(!storageProps.password) {
             storageProps.password = await promptText({
                 required: true,
                 message: "Password:",
@@ -115,8 +134,7 @@ export class StorageService {
         }
 
         this.config.setStorage(new Storage(storageProps as StorageProps));
-
-        await this.config.save();
+        this.config.save();
     }
 
     public async destroy(name: string, yes?: boolean, force?: boolean): Promise<void> {
@@ -154,8 +172,7 @@ export class StorageService {
         }
 
         this.config.removeStorage(name);
-
-        await this.config.save();
+        this.config.save();
     }
 
     public async list(): Promise<string> {
@@ -241,6 +258,6 @@ export class StorageService {
 
         this.config.default = storage.name;
 
-        await this.config.save();
+        this.config.save();
     }
 }
