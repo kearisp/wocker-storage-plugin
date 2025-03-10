@@ -1,17 +1,19 @@
-import {Config, ConfigProperties} from "@wocker/core";
-
 import {STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS} from "../env";
 
 
 export type StorageType = typeof STORAGE_TYPE_MINIO | typeof STORAGE_TYPE_REDIS;
 
-export type StorageProps = ConfigProperties & {
+export type StorageProps = {
+    name: string;
     type: StorageType;
     username: string;
     password: string;
+    imageName?: string;
+    imageVersion?: string;
 };
 
-export class Storage extends Config<StorageProps> {
+export class Storage {
+    public name: string;
     public type: StorageType;
     public username: string;
     public password: string;
@@ -19,17 +21,21 @@ export class Storage extends Config<StorageProps> {
     public imageVersion?: string;
 
     public constructor(props: StorageProps) {
-        super(props);
-
         const {
+            name,
             type,
             username,
-            password
+            password,
+            imageName,
+            imageVersion
         } = props;
 
+        this.name = name;
         this.type = type;
         this.username = username;
         this.password = password;
+        this.imageName = imageName;
+        this.imageVersion = imageVersion;
     }
 
     public get containerName(): string {
@@ -59,5 +65,16 @@ export class Storage extends Config<StorageProps> {
         }
 
         return `${imageName}:${imageVersion}`;
+    }
+
+    public toObject(): StorageProps {
+        return {
+            name: this.name,
+            type: this.type,
+            imageName: this.imageName,
+            imageVersion: this.imageVersion,
+            username: this.username,
+            password: this.password
+        };
     }
 }
