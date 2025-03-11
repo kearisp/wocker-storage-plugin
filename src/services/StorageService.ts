@@ -137,6 +137,29 @@ export class StorageService {
         this.config.save();
     }
 
+    public upgrade(storageProps: Partial<StorageProps> = {}): void {
+        const storage = this.config.getStorageOrDefault(storageProps.name);
+
+        let changed = false;
+
+        if(storageProps.imageName) {
+            storage.imageName = storageProps.imageName;
+            changed = true;
+        }
+
+        if(storageProps.imageVersion) {
+            storage.imageVersion = storageProps.imageVersion;
+            changed = true;
+        }
+
+        if(!changed) {
+            return;
+        }
+
+        this.config.setStorage(storage);
+        this.config.save();
+    }
+
     public async destroy(name: string, yes?: boolean, force?: boolean): Promise<void> {
         const storage = this.config.getStorage(name);
 
