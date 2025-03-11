@@ -31,19 +31,33 @@ export class StorageController {
             alias: "u",
             description: "User name"
         })
-        user?: string,
+        username?: string,
         @Option("password", {
             type: "string",
             alias: "p",
             description: "Password"
         })
-        password?: string
+        password?: string,
+        @Option("image", {
+            type: "string",
+            alias: "i",
+            description: "The image name to start the service with"
+        })
+        imageName?: string,
+        @Option("image-version", {
+            type: "string",
+            alias: "I",
+            description: "The image version to start the service with"
+        })
+        imageVersion?: string
     ): Promise<void> {
         await this.storageService.create({
             name,
             type,
-            username: user,
-            password
+            username,
+            password,
+            imageName,
+            imageVersion
         });
     }
 
@@ -63,6 +77,30 @@ export class StorageController {
         force?: boolean
     ): Promise<void> {
         await this.storageService.destroy(name, yes, force);
+    }
+
+    @Command("storage:upgrade [name]")
+    public async upgrade(
+        @Param("name")
+        name?: string,
+        @Option("image", {
+            type: "string",
+            alias: "i",
+            description: "The image name to start the service with"
+        })
+        imageName?: string,
+        @Option("image-version", {
+            type: "string",
+            alias: "I",
+            description: "The image version to start the service with"
+        })
+        imageVersion?: string
+    ): Promise<void> {
+        this.storageService.upgrade({
+            name,
+            imageName,
+            imageVersion
+        });
     }
 
     @Command("storage:ls")
