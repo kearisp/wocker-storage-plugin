@@ -183,8 +183,8 @@ export class StorageService {
                 await this.dockerService.removeContainer(storage.containerName);
 
                 if(this.appConfigService.isVersionGTE && this.appConfigService.isVersionGTE("1.0.19")) {
-                    if(await this.dockerService.hasVolume(storage.volumeName)) {
-                        await this.dockerService.rmVolume(storage.volumeName);
+                    if(await this.dockerService.hasVolume(storage.volume)) {
+                        await this.dockerService.rmVolume(storage.volume);
                     }
                 }
                 break;

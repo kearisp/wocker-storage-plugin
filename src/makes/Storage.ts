@@ -10,6 +10,7 @@ export type StorageProps = {
     password: string;
     imageName?: string;
     imageVersion?: string;
+    volume?: string;
 };
 
 export class Storage {
@@ -19,6 +20,7 @@ export class Storage {
     public password: string;
     public imageName?: string;
     public imageVersion?: string;
+    protected _volume?: string;
 
     public constructor(props: StorageProps) {
         const {
@@ -27,7 +29,8 @@ export class Storage {
             username,
             password,
             imageName,
-            imageVersion
+            imageVersion,
+            volume
         } = props;
 
         this.name = name;
@@ -36,6 +39,7 @@ export class Storage {
         this.password = password;
         this.imageName = imageName;
         this.imageVersion = imageVersion;
+        this._volume = volume;
     }
 
     public get containerName(): string {
@@ -43,6 +47,22 @@ export class Storage {
     }
 
     public get volumeName(): string {
+        return `wocker-storage-${this.type}-${this.name}`;
+    }
+
+    public get volume(): string {
+        if(!this._volume) {
+            this._volume = this.defaultVolume;
+        }
+
+        return this._volume;
+    }
+
+    public set volume(volume: string) {
+        this._volume = volume;
+    }
+
+    public get defaultVolume(): string {
         return `wocker-storage-${this.type}-${this.name}`;
     }
 
