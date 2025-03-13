@@ -237,7 +237,7 @@ export class StorageService {
                             MINIO_ROOT_PASSWORD: storage.password
                         },
                         volumes: [
-                            `${storage.volumeName}:/data`
+                            `${storage.volume}:/data`
                         ]
                     });
                 }

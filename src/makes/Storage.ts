@@ -46,10 +46,6 @@ export class Storage {
         return `${this.type}-${this.name}.ws`;
     }
 
-    public get volumeName(): string {
-        return `wocker-storage-${this.type}-${this.name}`;
-    }
-
     public get volume(): string {
         if(!this._volume) {
             this._volume = this.defaultVolume;
