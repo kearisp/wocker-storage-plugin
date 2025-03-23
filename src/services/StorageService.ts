@@ -142,6 +142,11 @@ export class StorageService {
 
         let changed = false;
 
+        if(storageProps.volume) {
+            storage.volume = storageProps.volume;
+            changed = true;
+        }
+
         if(storageProps.imageName) {
             storage.imageName = storageProps.imageName;
             changed = true;
