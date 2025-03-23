@@ -187,7 +187,12 @@ export class StorageService {
             case STORAGE_TYPE_MINIO: {
                 await this.dockerService.removeContainer(storage.containerName);
 
-                if(this.appConfigService.isVersionGTE && this.appConfigService.isVersionGTE("1.0.19")) {
+                if(storage.volume === storage.defaultVolume) {
+                    console.info(`Deletion of custom volume "${storage.volume}" skipped.`);
+                    break;
+                }
+
+                if(this.pluginConfigService.isVersionGTE("1.0.19")) {
                     if(await this.dockerService.hasVolume(storage.volume)) {
                         await this.dockerService.rmVolume(storage.volume);
                     }
@@ -221,6 +226,14 @@ export class StorageService {
         }
 
         const storage = this.config.getStorageOrDefault(name);
+
+        if(!this.pluginConfigService.isVersionGTE("1.0.19")) {
+            throw new Error("Please update wocker for using volume storage");
+        }
+
+        if(!await this.dockerService.hasVolume(storage.volume)) {
+            await this.dockerService.createVolume(storage.volume);
+        }
 
         switch(storage.type) {
             case STORAGE_TYPE_MINIO: {
