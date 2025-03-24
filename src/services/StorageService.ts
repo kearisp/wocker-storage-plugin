@@ -187,7 +187,7 @@ export class StorageService {
             case STORAGE_TYPE_MINIO: {
                 await this.dockerService.removeContainer(storage.containerName);
 
-                if(storage.volume === storage.defaultVolume) {
+                if(storage.volume !== storage.defaultVolume) {
                     console.info(`Deletion of custom volume "${storage.volume}" skipped.`);
                     break;
                 }
@@ -266,10 +266,15 @@ export class StorageService {
                     }
                 } = await container.inspect();
 
-                if(!Running) {
-                    await container.start();
-                    await this.proxyService.start();
+                await this.proxyService.start();
+
+                if(Running) {
+                    console.info(`Storage "${storage.name}" is already running at http://${storage.containerName}`);
+                    break;
                 }
+
+                await container.start();
+                console.info(`Storage "${storage.name}" started at http://${storage.containerName}`);
                 break;
             }
 
