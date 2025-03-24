@@ -83,6 +83,12 @@ export class StorageController {
     public async upgrade(
         @Param("name")
         name?: string,
+        @Option("volume", {
+            type: "string",
+            alias: "v",
+            description: "The volume to start the service with"
+        })
+        volume?: string,
         @Option("image", {
             type: "string",
             alias: "i",
@@ -98,6 +104,7 @@ export class StorageController {
     ): Promise<void> {
         this.storageService.upgrade({
             name,
+            volume,
             imageName,
             imageVersion
         });

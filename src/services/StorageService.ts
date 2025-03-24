@@ -142,6 +142,11 @@ export class StorageService {
 
         let changed = false;
 
+        if(storageProps.volume) {
+            storage.volume = storageProps.volume;
+            changed = true;
+        }
+
         if(storageProps.imageName) {
             storage.imageName = storageProps.imageName;
             changed = true;
@@ -180,12 +185,19 @@ export class StorageService {
 
         switch(storage.type) {
             case STORAGE_TYPE_MINIO: {
+                if(!this.pluginConfigService.isVersionGTE("1.0.19")) {
+                    throw new Error("Please update wocker for using volume storage");
+                }
+
                 await this.dockerService.removeContainer(storage.containerName);
 
-                if(this.appConfigService.isVersionGTE && this.appConfigService.isVersionGTE("1.0.19")) {
-                    if(await this.dockerService.hasVolume(storage.volume)) {
-                        await this.dockerService.rmVolume(storage.volume);
-                    }
+                if(storage.volume !== storage.defaultVolume) {
+                    console.info(`Deletion of custom volume "${storage.volume}" skipped.`);
+                    break;
+                }
+
+                if(await this.dockerService.hasVolume(storage.volume)) {
+                    await this.dockerService.rmVolume(storage.volume);
                 }
                 break;
             }
@@ -216,6 +228,14 @@ export class StorageService {
         }
 
         const storage = this.config.getStorageOrDefault(name);
+
+        if(!this.pluginConfigService.isVersionGTE("1.0.19")) {
+            throw new Error("Please update wocker for using volume storage");
+        }
+
+        if(!await this.dockerService.hasVolume(storage.volume)) {
+            await this.dockerService.createVolume(storage.volume);
+        }
 
         switch(storage.type) {
             case STORAGE_TYPE_MINIO: {
@@ -248,10 +268,15 @@ export class StorageService {
                     }
                 } = await container.inspect();
 
-                if(!Running) {
-                    await container.start();
-                    await this.proxyService.start();
+                await this.proxyService.start();
+
+                if(Running) {
+                    console.info(`Storage "${storage.name}" is already running at http://${storage.containerName}`);
+                    break;
                 }
+
+                await container.start();
+                console.info(`Storage "${storage.name}" started at http://${storage.containerName}`);
                 break;
             }
 
