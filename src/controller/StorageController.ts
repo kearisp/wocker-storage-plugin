@@ -62,17 +62,20 @@ export class StorageController {
     }
 
     @Command("storage:destroy [name]")
+    @Description("Destroys a storage service and deletes all associated volumes.")
     public async destroy(
         @Param("name")
         name: string,
         @Option("yes", {
             type: "boolean",
-            alias: "y"
+            alias: "y",
+            description: "Confirm destruction without prompting for confirmation."
         })
         yes?: boolean,
         @Option("force", {
             type: "boolean",
-            alias: "f"
+            alias: "f",
+            description: "Force deletion even if the storage is set as default"
         })
         force?: boolean
     ): Promise<void> {
@@ -80,6 +83,7 @@ export class StorageController {
     }
 
     @Command("storage:upgrade [name]")
+    @Description("Upgrades an existing storage service by changing its settings such as volume, image name, or image version.")
     public async upgrade(
         @Param("name")
         name?: string,
@@ -111,18 +115,20 @@ export class StorageController {
     }
 
     @Command("storage:ls")
+    @Description("Displays a list of all configured storage services.")
     public async list(): Promise<string> {
         return this.storageService.list();
     }
 
     @Command("storage:start [name]")
+    @Description("Starts a storage service. If the service is already running, use the restart option to restart it.")
     public async start(
         @Param("name")
         name?: string,
         @Option("restart", {
             type: "boolean",
             alias: "r",
-            description: "Restarting storage container"
+            description: "Restart the storage service if it is already running"
         })
         restart?: boolean
     ): Promise<void> {
@@ -130,6 +136,7 @@ export class StorageController {
     }
 
     @Command("storage:stop [name]")
+    @Description("Stops a running storage service.")
     public async stop(
         @Param("name")
         name?: string
@@ -138,6 +145,7 @@ export class StorageController {
     }
 
     @Command("storage:use <name>")
+    @Description("Sets the specified storage service as the current one for all subsequent operations.")
     public async use(
         @Param("name")
         name: string

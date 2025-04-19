@@ -1,6 +1,6 @@
 {
     "name": "@wocker/storage-plugin",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "author": "Kris Papercut <krispcut@gmail.com>",
     "description": "S3 storage for wocker",
     "license": "MIT",
@@ -19,7 +19,7 @@
         "url": "https://github.com/kearisp/wocker-storage-plugin/issues"
     },
     "scripts": {
-        "prepare": "npm run build",
+        "prepublishOnly": "npm run build",
         "watch": "tsc -w",
         "build": "tsc",
         "test": "echo \"Error: no test specified\" && exit 1"
@@ -30,6 +30,6 @@
         "cli-table3": "^0.6.5"
     },
     "devDependencies": {
-        "typescript": "^5.7.3"
+        "typescript": "^5.8.3"
     }
 }
