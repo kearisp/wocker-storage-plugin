@@ -5,12 +5,12 @@ import {
     Param,
     Option
 } from "@wocker/core";
-
 import {StorageService} from "../services/StorageService";
 import {StorageType} from "../makes/Storage";
 
 
 @Controller()
+@Description("Storage commands")
 export class StorageController {
     public constructor(
         protected readonly storageService: StorageService

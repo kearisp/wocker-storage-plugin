@@ -5,9 +5,8 @@ import {
     ProxyService,
     DockerService
 } from "@wocker/core";
-import {promptText, promptSelect, promptConfirm} from "@wocker/utils";
+import {promptInput, promptSelect, promptConfirm} from "@wocker/utils";
 import CliTable from "cli-table3";
-
 import {Storage, StorageType, StorageProps} from "../makes/Storage";
 import {Config, ConfigProps} from "../makes/Config";
 import {STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS} from "../env";
@@ -54,15 +53,12 @@ export class StorageService {
         }
 
         if(!storageProps.name) {
-            storageProps.name = await promptText({
-                message: "Storage name:",
-                type: "string",
+            storageProps.name = await promptInput({
+                message: "Storage name",
+                type: "text",
+                required: "Storage name is required",
                 validate: (name?: string) => {
-                    if(!name) {
-                        return "Storage name is required";
-                    }
-
-                    if(this.config.hasStorage(name)) {
+                    if(name && this.config.hasStorage(name)) {
                         return `Storage "${name}" is already exists`;
                     }
 
@@ -77,7 +73,7 @@ export class StorageService {
 
         if(!storageProps.type) {
             storageProps.type = await promptSelect<StorageType>({
-                message: "Storage type:",
+                message: "Storage type",
                 options: [
                     {label: "MinIO", value: STORAGE_TYPE_MINIO},
                     // {label: "Redis", value: STORAGE_TYPE_REDIS}
@@ -90,10 +86,10 @@ export class StorageService {
         }
 
         if(!storageProps.username) {
-            storageProps.username = await promptText({
+            storageProps.username = await promptInput({
                 required: true,
-                message: "Username:",
-                type: "string",
+                message: "Username",
+                type: "text",
                 validate(value) {
                     if(!value || value.length < 3) {
                         return "Username length should be at least 3 characters";
@@ -110,9 +106,9 @@ export class StorageService {
         }
 
         if(!storageProps.password) {
-            storageProps.password = await promptText({
+            storageProps.password = await promptInput({
                 required: true,
-                message: "Password:",
+                message: "Password",
                 type: "password",
                 validate(value) {
                     if(!value || value.length < 8) {
@@ -123,8 +119,8 @@ export class StorageService {
                 }
             }) as string;
 
-            const passwordConfirm = await promptText({
-                message: "Confirm password:",
+            const passwordConfirm = await promptInput({
+                message: "Confirm password",
                 type: "password"
             }) as string;
 
