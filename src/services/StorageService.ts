@@ -237,10 +237,21 @@ export class StorageService {
                         name: storage.containerName,
                         image: storage.imageTag,
                         env: {
-                            VIRTUAL_HOST: storage.containerName,
-                            VIRTUAL_PORT: "9000",
+                            MINIO_DOMAIN: storage.containerName,
                             MINIO_ROOT_USER: storage.username,
-                            MINIO_ROOT_PASSWORD: storage.password
+                            MINIO_ROOT_PASSWORD: storage.password,
+                            VIRTUAL_HOST_MULTIPORTS: JSON.stringify({
+                                [storage.containerName]: {
+                                    "/": {
+                                        port: 9000
+                                    }
+                                },
+                                [`*.${storage.containerName}`]: {
+                                    "/": {
+                                        port: 80
+                                    }
+                                }
+                            })
                         },
                         volumes: [
                             `${storage.volume}:/data`
