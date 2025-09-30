@@ -8,7 +8,7 @@ import {
 import {promptInput, promptSelect, promptConfirm} from "@wocker/utils";
 import CliTable from "cli-table3";
 import {Storage, StorageType, StorageProps} from "../makes/Storage";
-import {Config, ConfigProps} from "../makes/Config";
+import {Config} from "../makes/Config";
 import {STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS} from "../env";
 
 
@@ -25,22 +25,7 @@ export class StorageService {
 
     public get config(): Config {
         if(!this._config) {
-            const fs = this.pluginConfigService.fs;
-            const data: ConfigProps = fs.exists("config.json")
-                ? fs.readJSON("config.json")
-                : {};
-
-            this._config = new class extends Config {
-                public save(): void {
-                    if(!fs.exists()) {
-                        fs.mkdir("", {
-                            recursive: true
-                        });
-                    }
-
-                    fs.writeJSON("config.json", this.toJSON());
-                }
-            }(data);
+            this._config = Config.make(this.pluginConfigService.fs);
         }
 
         return this._config;
@@ -140,6 +125,11 @@ export class StorageService {
 
         if(storageProps.volume) {
             storage.volume = storageProps.volume;
+            changed = true;
+        }
+
+        if(storageProps.image) {
+            storage.image = storageProps.image;
             changed = true;
         }
 
