@@ -236,6 +236,7 @@ export class StorageService {
                         cmd: ["server", "/data", "--address", ":80", "--console-address", ":9000"],
                         name: storage.containerName,
                         image: storage.imageTag,
+                        aliases: storage.aliases,
                         env: {
                             MINIO_DOMAIN: storage.containerName,
                             MINIO_ROOT_USER: storage.username,

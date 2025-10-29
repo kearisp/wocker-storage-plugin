@@ -8,6 +8,7 @@ export type StorageProps = {
     type: StorageType;
     username: string;
     password: string;
+    buckets?: string[];
     image?: string;
     imageName?: string;
     imageVersion?: string;
@@ -19,6 +20,7 @@ export class Storage {
     public type: StorageType;
     public username: string;
     public password: string;
+    public buckets: string[];
     public _image?: string;
     public _imageName?: string;
     public _imageVersion?: string;
@@ -30,6 +32,7 @@ export class Storage {
             type,
             username,
             password,
+            buckets = [],
             image,
             imageName,
             imageVersion,
@@ -40,6 +43,7 @@ export class Storage {
         this.type = type;
         this.username = username;
         this.password = password;
+        this.buckets = buckets;
         this._image = image;
         this._imageName = imageName;
         this._imageVersion = imageVersion;
@@ -48,6 +52,12 @@ export class Storage {
 
     public get containerName(): string {
         return `${this.type}-${this.name}.ws`;
+    }
+
+    public get aliases(): string[] {
+        return this.buckets.map((bucket) => {
+            return `${bucket}.${this.type}-${this.name}.ws`;
+        });
     }
 
     public get volume(): string {
@@ -119,7 +129,8 @@ export class Storage {
             type: this.type,
             image: this.imageTag,
             username: this.username,
-            password: this.password
+            password: this.password,
+            buckets: this.buckets.length > 0 ? this.buckets : undefined
         };
     }
 }
