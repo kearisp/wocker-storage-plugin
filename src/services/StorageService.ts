@@ -1,15 +1,16 @@
 import {
     Injectable,
-    AppConfigService,
     PluginConfigService,
-    ProxyService,
     DockerService
 } from "@wocker/core";
-import {promptInput, promptSelect, promptConfirm} from "@wocker/utils";
+import {promptInput, promptSelect, promptConfirm} from "@wocker/prompts";
 import CliTable from "cli-table3";
-import {Storage, StorageType, StorageProps} from "../makes/Storage";
+import {MinioProvider} from "../providers/MinioProvider";
+import {Storage, StorageProps} from "../makes/Storage";
+import {StorageType} from "../types/StorageType";
+import {StorageStyle} from "../types/StorageStyle";
+import {StorageProvider} from "../types/StorageProvider";
 import {Config} from "../makes/Config";
-import {STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS} from "../env";
 
 
 @Injectable()
@@ -17,18 +18,24 @@ export class StorageService {
     protected _config?: Config;
 
     public constructor(
-        protected readonly appConfigService: AppConfigService,
         protected readonly pluginConfigService: PluginConfigService,
-        protected readonly proxyService: ProxyService,
+        protected readonly minioProvider: MinioProvider,
         protected readonly dockerService: DockerService
     ) {}
 
     public get config(): Config {
         if(!this._config) {
-            this._config = Config.make(this.pluginConfigService.fs);
+            this._config = this.pluginConfigService.getConfig(Config);
         }
 
         return this._config;
+    }
+
+    public provider(type: StorageType): StorageProvider {
+        switch(type) {
+            case StorageType.MINIO:
+                return this.minioProvider;
+        }
     }
 
     public async create(storageProps: Partial<StorageProps> = {}): Promise<void> {
@@ -52,17 +59,25 @@ export class StorageService {
             }) as string;
         }
 
-        if(storageProps.type && ![STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS].includes(storageProps.type)) {
+        if(storageProps.type && !StorageType.values().includes(storageProps.type)) {
             delete storageProps.type;
         }
 
         if(!storageProps.type) {
             storageProps.type = await promptSelect<StorageType>({
                 message: "Storage type",
-                options: [
-                    {label: "MinIO", value: STORAGE_TYPE_MINIO},
-                    // {label: "Redis", value: STORAGE_TYPE_REDIS}
-                ]
+                options: StorageType.options()
+            });
+        }
+
+        if(storageProps.style && !StorageStyle.values().includes(storageProps.style)) {
+            delete storageProps.style;
+        }
+
+        if(!storageProps.style) {
+            storageProps.style = await promptSelect<StorageStyle>({
+                message: "Storage address style",
+                options: StorageStyle.options()
             });
         }
 
@@ -82,7 +97,7 @@ export class StorageService {
 
                     return true;
                 }
-            }) as string;
+            });
         }
 
         if(storageProps.password && storageProps.password.length < 8) {
@@ -102,12 +117,12 @@ export class StorageService {
 
                     return true;
                 }
-            }) as string;
+            });
 
             const passwordConfirm = await promptInput({
                 message: "Confirm password",
                 type: "password"
-            }) as string;
+            });
 
             if(storageProps.password !== passwordConfirm) {
                 throw new Error("Passwords do not match")
@@ -123,6 +138,11 @@ export class StorageService {
 
         let changed = false;
 
+        if(storageProps.style) {
+            storage.style = storageProps.style;
+            changed = true;
+        }
+
         if(storageProps.volume) {
             storage.volume = storageProps.volume;
             changed = true;
@@ -130,16 +150,6 @@ export class StorageService {
 
         if(storageProps.image) {
             storage.image = storageProps.image;
-            changed = true;
-        }
-
-        if(storageProps.imageName) {
-            storage.imageName = storageProps.imageName;
-            changed = true;
-        }
-
-        if(storageProps.imageVersion) {
-            storage.imageVersion = storageProps.imageVersion;
             changed = true;
         }
 
@@ -170,7 +180,7 @@ export class StorageService {
         }
 
         switch(storage.type) {
-            case STORAGE_TYPE_MINIO: {
+            case StorageType.MINIO: {
                 if(!this.pluginConfigService.isVersionGTE("1.0.19")) {
                     throw new Error("Please update wocker for using volume storage");
                 }
@@ -187,9 +197,6 @@ export class StorageService {
                 }
                 break;
             }
-
-            case STORAGE_TYPE_REDIS:
-                break;
         }
 
         this.config.removeStorage(name);
@@ -223,79 +230,72 @@ export class StorageService {
             await this.dockerService.createVolume(storage.volume);
         }
 
-        switch(storage.type) {
-            case STORAGE_TYPE_MINIO: {
-                if(restart) {
-                    await this.dockerService.removeContainer(storage.containerName);
-                }
-
-                let container = await this.dockerService.getContainer(storage.containerName);
-
-                if(!container) {
-                    container = await this.dockerService.createContainer({
-                        cmd: ["server", "/data", "--address", ":80", "--console-address", ":9000"],
-                        name: storage.containerName,
-                        image: storage.imageTag,
-                        aliases: storage.aliases,
-                        env: {
-                            MINIO_DOMAIN: storage.containerName,
-                            MINIO_ROOT_USER: storage.username,
-                            MINIO_ROOT_PASSWORD: storage.password,
-                            VIRTUAL_HOST_MULTIPORTS: JSON.stringify({
-                                [storage.containerName]: {
-                                    "/": {
-                                        port: 9000
-                                    }
-                                },
-                                [`*.${storage.containerName}`]: {
-                                    "/": {
-                                        port: 80
-                                    }
-                                }
-                            })
-                        },
-                        volumes: [
-                            `${storage.volume}:/data`
-                        ]
-                    });
-                }
-
-                const {
-                    State: {
-                        Running
-                    }
-                } = await container.inspect();
-
-                await this.proxyService.start();
-
-                if(Running) {
-                    console.info(`Storage "${storage.name}" is already running at http://${storage.containerName}`);
-                    break;
-                }
-
-                await container.start();
-                console.info(`Storage "${storage.name}" started at http://${storage.containerName}`);
-                break;
-            }
-
-            case STORAGE_TYPE_REDIS: {
-                break;
-            }
-        }
+        await this.provider(storage.type).start(storage, restart);
     }
 
     public async stop(name?: string): Promise<void> {
         const storage = this.config.getStorageOrDefault(name);
 
         switch(storage.type) {
-            case STORAGE_TYPE_MINIO: {
+            case StorageType.MINIO: {
                 await this.dockerService.removeContainer(storage.containerName);
                 break;
             }
+        }
+    }
 
-            case STORAGE_TYPE_REDIS: {
-                break;
+    public async createBucket(name?: string, bucket?: string): Promise<void> {
+        const storage = this.config.getStorageOrDefault(name);
+
+        if(!bucket) {
+            bucket = await promptInput({
+                message: "Bucket",
+                type: "text",
+                required: true
+            });
+        }
+
+        const success = await this.provider(storage.type).createBucket(storage, bucket);
+
+        if(success) {
+            if(!storage.buckets.includes(bucket)) {
+                storage.buckets.push(bucket);
             }
+
+            this.config.save();
+        }
+
+        if(storage.style === StorageStyle.SUBDOMAIN) {
+            await this.start(name, true);
+        }
+    }
+
+    public async deleteBucket(name?: string, bucket?: string, yes?: boolean, force?: boolean) {
+        const storage = this.config.getStorageOrDefault(name);
+
+        if(!bucket) {
+            bucket = await promptInput({
+                message: "Bucket",
+                type: "text",
+                required: true
+            });
+        }
+
+        if(!yes) {
+            yes = await promptConfirm({
+                message: `Delete ${bucket}?`
+            });
+        }
+
+        if(!yes) {
+            throw new Error("Aborted");
+        }
+
+        const res = await this.provider(storage.type).deleteBucket(storage, bucket, force);
+
+        if(res) {
+            storage.buckets = storage.buckets.filter(b => b !== bucket);
+            this.config.save();
         }
     }
 

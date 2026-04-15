@@ -1,16 +1,19 @@
-import {STORAGE_TYPE_MINIO, STORAGE_TYPE_REDIS} from "../env";
+import {Image} from "@wocker/utils";
+import {StorageType} from "../types/StorageType";
+import {StorageStyle} from "../types/StorageStyle";
 
-
-export type StorageType = typeof STORAGE_TYPE_MINIO | typeof STORAGE_TYPE_REDIS;
 
 export type StorageProps = {
     name: string;
     type: StorageType;
+    style: StorageStyle;
     username: string;
     password: string;
     buckets?: string[];
     image?: string;
+    /** @deprecated */
     imageName?: string;
+    /** @deprecated */
     imageVersion?: string;
     volume?: string;
 };
@@ -18,35 +21,34 @@ export type StorageProps = {
 export class Storage {
     public name: string;
     public type: StorageType;
+    public style: StorageStyle;
     public username: string;
     public password: string;
     public buckets: string[];
     public _image?: string;
-    public _imageName?: string;
-    public _imageVersion?: string;
     protected _volume?: string;
 
     public constructor(props: StorageProps) {
         const {
             name,
             type,
+            style = StorageStyle.PATH,
             username,
             password,
             buckets = [],
-            image,
             imageName,
             imageVersion,
+            image = imageName && imageVersion ? `${imageName}:${imageVersion}` : imageName,
             volume
         } = props;
 
         this.name = name;
         this.type = type;
+        this.style = style;
         this.username = username;
         this.password = password;
         this.buckets = buckets;
         this._image = image;
-        this._imageName = imageName;
-        this._imageVersion = imageVersion;
         this._volume = volume;
     }
 
@@ -76,61 +78,32 @@ export class Storage {
         return `wocker-storage-${this.type}-${this.name}`;
     }
 
-    public get imageTag(): string {
+    public get image(): string {
         if(!this._image) {
-            let imageName = this._imageName,
-                imageVersion = this._imageVersion;
-
-            if(!imageName || !imageVersion) {
-                switch(this.type) {
-                    case STORAGE_TYPE_MINIO:
-                        imageName = "minio/minio";
-                        imageVersion = "latest";
-                        break;
-
-                    case STORAGE_TYPE_REDIS:
-                        imageName = "redis";
-                        imageVersion = "latest";
-                        break;
-                }
-            }
-
-            return `${imageName}:${imageVersion}`;
+            return "minio/minio:latest";
         }
 
         return this._image;
     }
 
     public set image(image: string) {
-        const pattern = /^(?:[a-zA-Z0-9.-]+(?::\d+)?\/)?(?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)?[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[\w][\w.-]{0,127})?(?:@sha256:[a-f0-9]{64})?$/;
-
-        if(!pattern.test(image)) {
+        if(!Image.isValid(image)) {
             throw new Error("Invalid image format.");
         }
 
         this._image = image;
     }
 
-    public set imageName(imageName: string) {
-        const [, imageVersion] = this.imageTag.split(":");
-
-        this._image = `${imageName}:${imageVersion}`;
-    }
-
-    public set imageVersion(imageVersion: string) {
-        const [imageName] = this.imageTag.split(":");
-
-        this._image = `${imageName}:${imageVersion}`;
-    }
-
     public toObject(): StorageProps {
         return {
             name: this.name,
             type: this.type,
-            image: this.imageTag,
+            style: this.style,
+            image: this.image,
             username: this.username,
             password: this.password,
-            buckets: this.buckets.length > 0 ? this.buckets : undefined
+            buckets: this.buckets.length > 0 ? this.buckets : undefined,
+            volume: this.volume
         };
     }
 }

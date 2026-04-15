@@ -1,6 +1,7 @@
 import {Plugin, PluginConfigService} from "@wocker/core";
 import {StorageController} from "./controller/StorageController";
 import {StorageService} from "./services/StorageService";
+import {MinioProvider} from "./providers/MinioProvider";
 
 
 @Plugin({
@@ -10,7 +11,8 @@ import {StorageService} from "./services/StorageService";
     ],
     providers: [
         PluginConfigService,
-        StorageService
+        StorageService,
+        MinioProvider
     ]
 })
 export default class StoragePlugin {}

@@ -1,4 +1,4 @@
-import {FileSystem} from "@wocker/core";
+import {PluginConfig} from "@wocker/core";
 import {Storage, StorageProps} from "./Storage";
 
 
@@ -7,11 +7,13 @@ export type ConfigProps = {
     storages?: StorageProps[];
 };
 
-export abstract class Config {
+export class Config extends PluginConfig {
     public default?: string;
     public storages: Storage[];
 
     public constructor(props: ConfigProps) {
+        super(props);
+
         const {
             default: defaultStorage,
             storages = []
@@ -86,30 +88,10 @@ export abstract class Config {
         }
     }
 
-    public abstract save(): void;
-
-    public toJSON(): ConfigProps {
+    public toObject(): ConfigProps {
         return {
             default: this.default,
             storages: this.storages.map((storage) => storage.toObject())
         };
-    }
-
-    public static make(fs: FileSystem): Config {
-        const data: ConfigProps = fs.exists("config.json")
-            ? fs.readJSON("config.json")
-            : {};
-
-        return new class extends Config {
-            public save(): void {
-                if(!fs.exists()) {
-                    fs.mkdir("", {
-                        recursive: true
-                    });
-                }
-
-                fs.writeJSON("config.json", this.toJSON());
-            }
-        }(data);
     }
 }
