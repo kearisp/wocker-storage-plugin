@@ -1,6 +1,7 @@
 {
     "name": "@wocker/storage-plugin",
-    "version": "1.0.9",
+    "type": "commonjs",
+    "version": "1.0.10",
     "author": "Kris Papercut <krispcut@gmail.com>",
     "description": "S3 storage for wocker",
     "license": "MIT",
@@ -25,8 +26,9 @@
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "dependencies": {
-        "@wocker/core": "^1.0.25",
-        "@wocker/utils": "^2.0.3",
+        "@wocker/core": "^1.1.1",
+        "@wocker/prompts": "^1.0.0",
+        "@wocker/utils": "^2.0.13",
         "cli-table3": "^0.6.5"
     },
     "devDependencies": {
