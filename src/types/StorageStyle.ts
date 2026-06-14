@@ -6,7 +6,7 @@ enum StorageStyleEnum {
 export type StorageStyle = StorageStyleEnum;
 
 export const StorageStyle = Object.assign({}, StorageStyleEnum, {
-    label: (style: StorageStyleEnum) => {
+    label: (style: StorageStyleEnum): string => {
         switch(style) {
             case StorageStyleEnum.PATH:
                 return "Path";
@@ -24,5 +24,5 @@ export const StorageStyle = Object.assign({}, StorageStyleEnum, {
             value: style
         };
     }),
-    values: () => Object.values(StorageStyleEnum)
+    values: (): StorageStyleEnum[] => Object.values(StorageStyleEnum)
 });
