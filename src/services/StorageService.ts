@@ -11,6 +11,7 @@ import {StorageType} from "../types/StorageType";
 import {StorageStyle} from "../types/StorageStyle";
 import {StorageProvider} from "../types/StorageProvider";
 import {Config} from "../makes/Config";
+import {isValidBuketName, validateBucketName} from "../utils";
 
 
 @Injectable()
@@ -35,6 +36,9 @@ export class StorageService {
         switch(type) {
             case StorageType.MINIO:
                 return this.minioProvider;
+
+            default:
+                throw new Error(`Unsupported storage type "${type}"`);
         }
     }
 
@@ -205,11 +209,33 @@ export class StorageService {
 
     public async list(): Promise<string> {
         const table = new CliTable({
-            head: ["Name", "Type", "Container name"]
+            head: ["Name", "Type", "Container name", "Status"]
         });
 
         for(const storage of this.config.storages) {
-            table.push([storage.name + (this.config.default === storage.name ? " (default)" : ""), storage.type, storage.containerName]);
+            let status = "stopped";
+
+            try {
+                const container = await this.dockerService.getContainer(storage.containerName);
+
+                if(container) {
+                    const {
+                        State: {
+                            Running
+                        }
+                    } = await container.inspect();
+
+                    status = Running ? "running" : "stopped";
+                }
+            }
+            catch(ignore) {}
+
+            table.push([
+                storage.name + (this.config.default === storage.name ? " (default)" : ""),
+                storage.type,
+                storage.containerName,
+                status
+            ]);
         }
 
         return table.toString();
@@ -247,11 +273,19 @@ export class StorageService {
     public async createBucket(name?: string, bucket?: string): Promise<void> {
         const storage = this.config.getStorageOrDefault(name);
 
-        if(!bucket) {
+        if(!bucket || !isValidBuketName(bucket)) {
             bucket = await promptInput({
                 message: "Bucket",
                 type: "text",
-                required: true
+                required: true,
+                default: bucket,
+                validate: (value) => {
+                    if(typeof value === "string") {
+                        return validateBucketName(value);
+                    }
+
+                    return true;
+                }
             });
         }
 
@@ -273,11 +307,19 @@ export class StorageService {
     public async deleteBucket(name?: string, bucket?: string, yes?: boolean, force?: boolean) {
         const storage = this.config.getStorageOrDefault(name);
 
-        if(!bucket) {
+        if(!bucket || !isValidBuketName(bucket)) {
             bucket = await promptInput({
                 message: "Bucket",
                 type: "text",
-                required: true
+                required: true,
+                default: bucket,
+                validate: (value) => {
+                    if(typeof value === "string") {
+                        return validateBucketName(value);
+                    }
+
+                    return true;
+                }
             });
         }
 
@@ -296,6 +338,10 @@ export class StorageService {
         if(res) {
             storage.buckets = storage.buckets.filter(b => b !== bucket);
             this.config.save();
+        }
+
+        if(storage.style === StorageStyle.SUBDOMAIN) {
+            await this.start(name, true);
         }
     }
 

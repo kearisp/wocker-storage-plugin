@@ -1,7 +1,7 @@
 {
     "name": "@wocker/storage-plugin",
     "type": "commonjs",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "author": "Kris Papercut <krispcut@gmail.com>",
     "description": "S3 storage for wocker",
     "license": "MIT",

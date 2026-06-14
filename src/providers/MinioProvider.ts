@@ -84,27 +84,39 @@ export class MinioProvider extends StorageProvider {
 
         await this.proxyService.start();
 
+        const storageUrls = storage.style === StorageStyle.PATH
+            ? [`http://${storage.containerName}`]
+            : storage.bucketUrls;
+
         if(Running) {
-            this.processService.write(`Storage "${storage.name}" is already running at http://${storage.containerName}\n`);
+            this.processService.write(`Storage "${storage.name}" is already running${storageUrls.length > 0 ? ":" : ""}\n`);
+
+            for(const url of storageUrls) {
+                this.processService.write(`  ${url}\n`);
+            }
+
+            this.processService.write(`Console "${storage.name}" is running at ${storage.consoleUrl}\n`);
             return;
         }
 
         await container.start();
 
-        this.processService.write(`Storage "${storage.name}" started at http://${storage.containerName}\n`);
+        if(storageUrls.length > 0) {
+            this.processService.write(`Storage "${storage.name}" started:\n`);
 
-        if(storage.style === StorageStyle.PATH) {
-            this.processService.write(`Console "${storage.name}" started at http://console.${storage.containerName}\n`);
+            for(const url of storageUrls) {
+                this.processService.write(`  ${url}\n`);
+            }
         }
+        else {
+            this.processService.write(`Storage "${storage.name}" started. Create a bucket (storage:create-bucket) to get an S3 endpoint.\n`);
+        }
+
+        this.processService.write(`Console "${storage.name}" started at ${storage.consoleUrl}\n`);
 
         this.processService.write(`${colors.green("Don't forget to add these lines into hosts file:")}\n`);
 
-        const domains = [
-            storage.containerName,
-            ...storage.style === StorageStyle.SUBDOMAIN ? storage.aliases : []
-        ];
-
-        for(const domain of domains) {
+        for(const domain of storage.domains) {
             this.processService.write(`${colors.gray(`127.0.0.1 ${domain}`)}\n`);
         }
     }
