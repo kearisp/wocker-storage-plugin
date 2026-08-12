@@ -30,7 +30,9 @@ jobs:
                 registry-url: 'https://registry.npmjs.org'
 
           - name: Setup beta version
-            uses: ./.github/actions/beta-version
+            uses: kearisp/npm-version-action@v0.0.3
+            with:
+                tag: beta
 
           - name: Cache dependencies
             uses: actions/cache@v6
