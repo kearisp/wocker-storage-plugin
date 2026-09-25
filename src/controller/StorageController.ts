@@ -121,7 +121,7 @@ export class StorageController {
         name?: string,
         @Param("bucket")
         bucket?: string
-    ) {
+    ): Promise<void> {
         await this.storageService.createBucket(name, bucket);
     }
 
@@ -139,7 +139,7 @@ export class StorageController {
         @Option("force", "f")
         @Description("Force deletion even if the bucket is not empty.")
         force?: boolean
-    ) {
+    ): Promise<void> {
         await this.storageService.deleteBucket(name, bucket, yes, force);
     }
 

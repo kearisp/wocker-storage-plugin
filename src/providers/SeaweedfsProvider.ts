@@ -1,5 +1,6 @@
 import {
     Injectable,
+    PluginConfigService,
     ProxyService,
     DockerService,
     ProcessService
@@ -11,13 +12,35 @@ import {StorageStyle} from "../types/StorageStyle";
 
 
 @Injectable()
-export class MinioProvider extends StorageProvider {
+export class SeaweedfsProvider extends StorageProvider {
     public constructor(
         protected readonly processService: ProcessService,
         protected readonly proxyService: ProxyService,
-        protected readonly dockerService: DockerService
+        protected readonly dockerService: DockerService,
+        protected readonly pluginConfigService: PluginConfigService
     ) {
         super();
+    }
+
+    protected identitiesFileName(storage: Storage): string {
+        return `${storage.name}.s3-identities.json`;
+    }
+
+    protected writeIdentities(storage: Storage): void {
+        this.pluginConfigService.fs.writeJSON(this.identitiesFileName(storage), {
+            identities: [
+                {
+                    name: storage.username,
+                    credentials: [
+                        {
+                            accessKey: storage.username,
+                            secretKey: storage.password
+                        }
+                    ],
+                    actions: ["Admin", "Read", "Write"]
+                }
+            ]
+        });
     }
 
     public async start(storage: Storage, restart?: boolean) {
@@ -28,8 +51,10 @@ export class MinioProvider extends StorageProvider {
         let container = await this.dockerService.getContainer(storage.containerName);
 
         if(!container) {
+            this.writeIdentities(storage);
+
             container = await this.dockerService.createContainer({
-                cmd: ["server", "/data", "--address", ":80", "--console-address", ":9000"],
+                cmd: ["server", "-dir=/data", "-ip.bind=0.0.0.0", "-filer=true", "-s3", "-s3.config=/etc/seaweedfs/s3.json"],
                 name: storage.containerName,
                 image: storage.image,
                 aliases: storage.aliases,
@@ -40,12 +65,12 @@ export class MinioProvider extends StorageProvider {
                         storage.style === StorageStyle.PATH ? {
                             [storage.containerName]: {
                                 "/": {
-                                    port: 80
+                                    port: 8333
                                 }
                             },
                             [`console.${storage.containerName}`]: {
                                 "/": {
-                                    port: 9000
+                                    port: 8888
                                 }
                             }
                         } : storage.aliases.reduce((res, subdomain) => {
@@ -53,26 +78,22 @@ export class MinioProvider extends StorageProvider {
                                 ...res,
                                 [subdomain]: {
                                     "/": {
-                                        port: 80
+                                        port: 8333
                                     }
                                 }
                             };
                         }, {
                             [storage.containerName]: {
                                 "/": {
-                                    port: 9000
+                                    port: 8888
                                 }
                             }
                         })
-                    ),
-                    ...storage.style === StorageStyle.SUBDOMAIN ? {
-                        MINIO_DOMAIN: storage.containerName
-                    } : {},
-                    MINIO_ROOT_USER: storage.username,
-                    MINIO_ROOT_PASSWORD: storage.password
+                    )
                 },
                 volumes: [
-                    `${storage.volume}:/data`
+                    `${storage.volume}:/data`,
+                    `${this.pluginConfigService.fs.path(this.identitiesFileName(storage))}:/etc/seaweedfs/s3.json:ro`
                 ]
             });
         }
@@ -125,13 +146,7 @@ export class MinioProvider extends StorageProvider {
     public async createBucket(storage: Storage, bucket: string) {
         await this.dockerService.exec(
             storage.containerName,
-            ["mc", "alias", "set", storage.name, `http://${storage.containerName}`, storage.username, storage.password],
-            true
-        );
-
-        await this.dockerService.exec(
-            storage.containerName,
-            ["mc", "mb", `${storage.name}/${bucket}`],
+            ["weed", "shell", "-c", `s3.bucket.create -name ${bucket}`],
             true
         );
 
@@ -141,13 +156,9 @@ export class MinioProvider extends StorageProvider {
     public async deleteBucket(storage: Storage, bucket: string, force?: boolean) {
         await this.dockerService.exec(
             storage.containerName,
-            ["mc", "alias", "set", storage.name, `http://${storage.containerName}`, storage.username, storage.password],
-            true
-        );
-
-        await this.dockerService.exec(
-            storage.containerName,
-            ["mc", "rb", ...force ? ["--force"] : [], `${storage.name}/${bucket}`],
+            force
+                ? ["weed", "shell", "-c", `fs.rm -r /buckets/${bucket}`]
+                : ["weed", "shell", "-c", `s3.bucket.delete -name ${bucket}`],
             true
         );
 

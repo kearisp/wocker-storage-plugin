@@ -101,7 +101,13 @@ export class Storage {
 
     public get image(): string {
         if(!this._image) {
-            return "minio/minio:latest";
+            switch(this.type) {
+                case StorageType.SEAWEEDFS:
+                    return "chrislusf/seaweedfs:latest";
+
+                default:
+                    return "minio/minio:latest";
+            }
         }
 
         return this._image;

@@ -6,6 +6,7 @@ import {
 import {promptInput, promptSelect, promptConfirm} from "@wocker/prompts";
 import CliTable from "cli-table3";
 import {MinioProvider} from "../providers/MinioProvider";
+import {SeaweedfsProvider} from "../providers/SeaweedfsProvider";
 import {Storage, StorageProps} from "../makes/Storage";
 import {StorageType} from "../types/StorageType";
 import {StorageStyle} from "../types/StorageStyle";
@@ -21,6 +22,7 @@ export class StorageService {
     public constructor(
         protected readonly pluginConfigService: PluginConfigService,
         protected readonly minioProvider: MinioProvider,
+        protected readonly seaweedfsProvider: SeaweedfsProvider,
         protected readonly dockerService: DockerService
     ) {}
 
@@ -36,6 +38,9 @@ export class StorageService {
         switch(type) {
             case StorageType.MINIO:
                 return this.minioProvider;
+
+            case StorageType.SEAWEEDFS:
+                return this.seaweedfsProvider;
 
             default:
                 throw new Error(`Unsupported storage type "${type}"`);
@@ -184,7 +189,8 @@ export class StorageService {
         }
 
         switch(storage.type) {
-            case StorageType.MINIO: {
+            case StorageType.MINIO:
+            case StorageType.SEAWEEDFS: {
                 if(!this.pluginConfigService.isVersionGTE("1.0.19")) {
                     throw new Error("Please update wocker for using volume storage");
                 }
@@ -198,6 +204,14 @@ export class StorageService {
 
                 if(await this.dockerService.hasVolume(storage.volume)) {
                     await this.dockerService.rmVolume(storage.volume);
+                }
+
+                if(storage.type === StorageType.SEAWEEDFS) {
+                    const identitiesFile = `${storage.name}.s3-identities.json`;
+
+                    if(this.pluginConfigService.fs.exists(identitiesFile)) {
+                        this.pluginConfigService.fs.rm(identitiesFile);
+                    }
                 }
                 break;
             }
@@ -263,7 +277,8 @@ export class StorageService {
         const storage = this.config.getStorageOrDefault(name);
 
         switch(storage.type) {
-            case StorageType.MINIO: {
+            case StorageType.MINIO:
+            case StorageType.SEAWEEDFS: {
                 await this.dockerService.removeContainer(storage.containerName);
                 break;
             }
