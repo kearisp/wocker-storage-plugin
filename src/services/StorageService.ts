@@ -6,11 +6,13 @@ import {
 import {promptInput, promptSelect, promptConfirm} from "@wocker/prompts";
 import CliTable from "cli-table3";
 import {MinioProvider} from "../providers/MinioProvider";
+import {SeaweedfsProvider} from "../providers/SeaweedfsProvider";
 import {Storage, StorageProps} from "../makes/Storage";
 import {StorageType} from "../types/StorageType";
 import {StorageStyle} from "../types/StorageStyle";
 import {StorageProvider} from "../types/StorageProvider";
 import {Config} from "../makes/Config";
+import {isValidBuketName, validateBucketName} from "../utils";
 
 
 @Injectable()
@@ -20,6 +22,7 @@ export class StorageService {
     public constructor(
         protected readonly pluginConfigService: PluginConfigService,
         protected readonly minioProvider: MinioProvider,
+        protected readonly seaweedfsProvider: SeaweedfsProvider,
         protected readonly dockerService: DockerService
     ) {}
 
@@ -35,6 +38,12 @@ export class StorageService {
         switch(type) {
             case StorageType.MINIO:
                 return this.minioProvider;
+
+            case StorageType.SEAWEEDFS:
+                return this.seaweedfsProvider;
+
+            default:
+                throw new Error(`Unsupported storage type "${type}"`);
         }
     }
 
@@ -180,7 +189,8 @@ export class StorageService {
         }
 
         switch(storage.type) {
-            case StorageType.MINIO: {
+            case StorageType.MINIO:
+            case StorageType.SEAWEEDFS: {
                 if(!this.pluginConfigService.isVersionGTE("1.0.19")) {
                     throw new Error("Please update wocker for using volume storage");
                 }
@@ -195,6 +205,14 @@ export class StorageService {
                 if(await this.dockerService.hasVolume(storage.volume)) {
                     await this.dockerService.rmVolume(storage.volume);
                 }
+
+                if(storage.type === StorageType.SEAWEEDFS) {
+                    const identitiesFile = `${storage.name}.s3-identities.json`;
+
+                    if(this.pluginConfigService.fs.exists(identitiesFile)) {
+                        this.pluginConfigService.fs.rm(identitiesFile);
+                    }
+                }
                 break;
             }
         }
@@ -205,11 +223,33 @@ export class StorageService {
 
     public async list(): Promise<string> {
         const table = new CliTable({
-            head: ["Name", "Type", "Container name"]
+            head: ["Name", "Type", "Container name", "Status"]
         });
 
         for(const storage of this.config.storages) {
-            table.push([storage.name + (this.config.default === storage.name ? " (default)" : ""), storage.type, storage.containerName]);
+            let status = "stopped";
+
+            try {
+                const container = await this.dockerService.getContainer(storage.containerName);
+
+                if(container) {
+                    const {
+                        State: {
+                            Running
+                        }
+                    } = await container.inspect();
+
+                    status = Running ? "running" : "stopped";
+                }
+            }
+            catch(ignore) {}
+
+            table.push([
+                storage.name + (this.config.default === storage.name ? " (default)" : ""),
+                storage.type,
+                storage.containerName,
+                status
+            ]);
         }
 
         return table.toString();
@@ -237,7 +277,8 @@ export class StorageService {
         const storage = this.config.getStorageOrDefault(name);
 
         switch(storage.type) {
-            case StorageType.MINIO: {
+            case StorageType.MINIO:
+            case StorageType.SEAWEEDFS: {
                 await this.dockerService.removeContainer(storage.containerName);
                 break;
             }
@@ -247,11 +288,19 @@ export class StorageService {
     public async createBucket(name?: string, bucket?: string): Promise<void> {
         const storage = this.config.getStorageOrDefault(name);
 
-        if(!bucket) {
+        if(!bucket || !isValidBuketName(bucket)) {
             bucket = await promptInput({
                 message: "Bucket",
                 type: "text",
-                required: true
+                required: true,
+                default: bucket,
+                validate: (value) => {
+                    if(typeof value === "string") {
+                        return validateBucketName(value);
+                    }
+
+                    return true;
+                }
             });
         }
 
@@ -273,11 +322,19 @@ export class StorageService {
     public async deleteBucket(name?: string, bucket?: string, yes?: boolean, force?: boolean) {
         const storage = this.config.getStorageOrDefault(name);
 
-        if(!bucket) {
+        if(!bucket || !isValidBuketName(bucket)) {
             bucket = await promptInput({
                 message: "Bucket",
                 type: "text",
-                required: true
+                required: true,
+                default: bucket,
+                validate: (value) => {
+                    if(typeof value === "string") {
+                        return validateBucketName(value);
+                    }
+
+                    return true;
+                }
             });
         }
 
@@ -296,6 +353,10 @@ export class StorageService {
         if(res) {
             storage.buckets = storage.buckets.filter(b => b !== bucket);
             this.config.save();
+        }
+
+        if(storage.style === StorageStyle.SUBDOMAIN) {
+            await this.start(name, true);
         }
     }
 

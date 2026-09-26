@@ -2,6 +2,7 @@ import {Plugin, PluginConfigService} from "@wocker/core";
 import {StorageController} from "./controller/StorageController";
 import {StorageService} from "./services/StorageService";
 import {MinioProvider} from "./providers/MinioProvider";
+import {SeaweedfsProvider} from "./providers/SeaweedfsProvider";
 
 
 @Plugin({
@@ -12,7 +13,8 @@ import {MinioProvider} from "./providers/MinioProvider";
     providers: [
         PluginConfigService,
         StorageService,
-        MinioProvider
+        MinioProvider,
+        SeaweedfsProvider
     ]
 })
 export default class StoragePlugin {}

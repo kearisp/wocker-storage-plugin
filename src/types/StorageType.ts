@@ -1,5 +1,6 @@
 enum StorageTypeEnum {
-    MINIO = "minio"
+    MINIO = "minio",
+    SEAWEEDFS = "seaweedfs"
 }
 
 export type StorageType = StorageTypeEnum;
@@ -9,6 +10,9 @@ export const StorageType = Object.assign({}, StorageTypeEnum, {
         switch(type) {
             case StorageTypeEnum.MINIO:
                 return "MinIO";
+
+            case StorageTypeEnum.SEAWEEDFS:
+                return "SeaweedFS";
 
             default:
                 return type;

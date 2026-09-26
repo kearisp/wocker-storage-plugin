@@ -62,6 +62,27 @@ export class Storage {
         });
     }
 
+    public get domains(): string[] {
+        return [
+            this.containerName,
+            ...this.style === StorageStyle.SUBDOMAIN ? this.aliases : []
+        ];
+    }
+
+    public get bucketUrls(): string[] {
+        if(this.style === StorageStyle.SUBDOMAIN) {
+            return this.aliases.map((alias) => `http://${alias}`);
+        }
+
+        return this.buckets.map((bucket) => `http://${this.containerName}/${bucket}`);
+    }
+
+    public get consoleUrl(): string {
+        return this.style === StorageStyle.PATH
+            ? `http://console.${this.containerName}`
+            : `http://${this.containerName}`;
+    }
+
     public get volume(): string {
         if(!this._volume) {
             this._volume = this.defaultVolume;
@@ -80,7 +101,13 @@ export class Storage {
 
     public get image(): string {
         if(!this._image) {
-            return "minio/minio:latest";
+            switch(this.type) {
+                case StorageType.SEAWEEDFS:
+                    return "chrislusf/seaweedfs:latest";
+
+                default:
+                    return "minio/minio:latest";
+            }
         }
 
         return this._image;

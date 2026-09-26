@@ -115,27 +115,31 @@ export class StorageController {
 
     @Command("storage:create-bucket [bucket]")
     @Command("storage:create-bucket <name>/<bucket>")
+    @Description("Creates a new bucket in the specified storage service.")
     public async createBucket(
         @Param("name")
         name?: string,
         @Param("bucket")
         bucket?: string
-    ) {
+    ): Promise<void> {
         await this.storageService.createBucket(name, bucket);
     }
 
     @Command("storage:delete-bucket [bucket]")
     @Command("storage:delete-bucket <name>/<bucket>")
+    @Description("Deletes a bucket from the specified storage service.")
     public async deleteBucket(
         @Param("name")
         name?: string,
         @Param("bucket")
         bucket?: string,
         @Option("yes", "y")
+        @Description("Confirm deletion without prompting for confirmation.")
         yes?: boolean,
         @Option("force", "f")
+        @Description("Force deletion even if the bucket is not empty.")
         force?: boolean
-    ) {
+    ): Promise<void> {
         await this.storageService.deleteBucket(name, bucket, yes, force);
     }
 
